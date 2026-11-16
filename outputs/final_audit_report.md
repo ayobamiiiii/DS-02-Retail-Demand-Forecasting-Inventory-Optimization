@@ -9,13 +9,13 @@
 
 The Favorita pipeline completed from the existing project. Naive Weekly, LightGBM, Prophet, and Darts ran and were compared on the same six series and the same untouched evaluation dates. The separate primary baseline run evaluates 116 series. Both use chronological selection, calibration, and evaluation periods. The model comparison dashboard reads the generated JSON/CSV outputs dynamically. The OR-Tools optimizer returned `OPTIMAL` for all 110 current recommendation rows. All 16 tests pass, including dashboard tab smoke checks.
 
-TFT is implemented and was genuinely attempted with PyTorch Forecasting. Its dependencies imported, but the bounded CPU attempt did not return during this audit run. Apple MPS is built into the Torch package but reports unavailable on this Mac, so TFT could not complete through an accelerator. It is not scored or represented as implemented successfully.
+TFT is implemented and was genuinely attempted with PyTorch Forecasting. Its dependencies imported, but the bounded CPU attempt did not return during the earlier audit run. Apple MPS is built into the Torch package but reports unavailable on this Mac. A minimal Google Colab GPU notebook and exact 116-series data export are now prepared; the Colab training has not been run, so TFT is still not scored or represented as successfully evaluated.
 
 ## Requirements audit
 
 | Assignment requirement | Status | Evidence / result |
 |---|---|---|
-| Forecast models and actual validation metrics | **Complete with limitation** | Naive Weekly and LightGBM scored on the 116-series primary holdout. Prophet and Darts each ran in all benchmark windows and were scored with the same six-series common holdout as Naive/LightGBM. TFT did not complete and has no score. |
+| Forecast models and actual validation metrics | **Complete with limitation** | Naive Weekly and LightGBM scored on the 116-series primary holdout. Prophet and Darts each ran in all benchmark windows and were scored with the same six-series common holdout as Naive/LightGBM. Colab TFT notebook/data handoff is prepared, but GPU training has not completed and has no score. |
 | Chronological train/validation separation and leakage prevention | **Complete** | Selection: 2017-06-21–2017-07-04; calibration: 2017-07-05–2017-07-18; untouched evaluation: 2017-07-19–2017-08-15. Sales lags and store covariates use prior-day information; recursive forecasts use generated predictions. Promotion and calendar inputs are known-ahead data. |
 | Hierarchical reconciliation | **Complete** | Generated bottom-up rollups at item-store, item, store, city, state, and overall levels. The hierarchy test passes; current output contains 2,512 rows over all six levels. |
 | Prediction intervals and coverage | **Complete, empirical** | Absolute residual quantiles calibrated on the separate 14-day calibration period. Primary 116-series holdout coverage: 90.12% (nominal 90%, 3,248 observations). Common six-series selected-model coverage: 93.45% (168 observations). Coverage is measured only on the later untouched block. |
@@ -54,7 +54,7 @@ LightGBM had the lowest selection WAPE and was therefore used for the calibrated
 
 ### TFT execution record
 
-The compact PyTorch Forecasting TFT path is implemented (56-day maximum encoder, 14/28-day forecast window, hidden size 8, one epoch, two training batches, six-series sample). Torch, Lightning, and PyTorch Forecasting imports succeeded. On this arm64 Mac, `torch.backends.mps.is_built()` is true and `torch.backends.mps.is_available()` is false; the attempt therefore selected CPU. The training/prediction call did not return during this audit, and it did not produce held-out predictions or metrics. No dependency or compatibility exception was observed. TFT is excluded from the model comparison; its result is **not evaluated**, not zero and not estimated.
+The local compact PyTorch Forecasting TFT path was attempted on six series, but it did not return during that audit; MPS was unavailable and no dependency exception was observed. For the final handoff, `notebooks/tft_colab.ipynb` now uses the exact primary 116-series split and a T4-sized architecture (hidden size 8, two heads, batch 32, up to 15 epochs with early stopping). Its dataset export retains real history, marks `unit_sales` as the unknown target, and evaluates the same rolling one-step validation observations. The Colab run has not yet occurred. TFT remains excluded from all scored comparisons; no TFT metric or prediction is claimed.
 
 ## Inventory optimization
 

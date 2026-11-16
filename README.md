@@ -53,6 +53,10 @@ Open the local Dash URL printed by `app.py`. The six tabs are Executive Overview
 
 The main pipeline writes forecast and validation CSVs, metrics JSON, hierarchy rollups, inventory recommendations, and a LightGBM model under `outputs/`. `config/default.yaml` controls stores, sample size, validation horizon, benchmark windows, inventory costs, service level, and order bounds. The expanded model benchmark uses a common configurable series sample with three disjoint windows: early model selection, residual calibration, and a final untouched evaluation period. Model-specific execution failures are recorded in `outputs/metrics/model_comparison.json` when the benchmark completes.
 
+## Optional Colab TFT evaluation
+
+`notebooks/tft_colab.ipynb` is a standalone GPU handoff for the existing primary validation sample. The accompanying local export is `data/processed/tft_favorita_116_series.csv` (generated from the processed Favorita panel and intentionally Git-ignored). In Colab, enable a T4 GPU, open the notebook, run its cells, and upload that CSV when prompted. The notebook checks the exact 116 series and 3,248 held-out observations, then writes predictions, metrics, a best checkpoint, training history, and an execution report to a downloadable ZIP. No TFT score exists until that run completes successfully.
+
 ## Model evaluation
 
 Metrics are computed from held-out predictions, never hard-coded. WAPE is aggregate absolute error divided by aggregate actual sales; RMSSE is computed per series and averaged; RMSE is in units/day. The performance dashboard loads the generated metric JSON and benchmark predictions dynamically. It displays successful models on the same series and dates, highlights per-metric leaders, and recomputes metrics against the saved actuals and pre-evaluation history.
