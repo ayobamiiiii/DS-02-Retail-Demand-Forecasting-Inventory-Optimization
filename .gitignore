@@ -19,6 +19,7 @@ __pycache__/
 *.p12
 *.pfx
 credentials.json
+credentials.*
 service-account*.json
 secrets.*
 .idea/

@@ -108,4 +108,4 @@ python -m compileall -q src dashboard app.py tests
 python -m pip check
 ```
 
-`outputs/final_audit_report.md` is the run-specific checklist, including actual model status and scores, test output, and known limitations. Generated data and metrics are intentionally ignored by Git; the report can be included separately when preparing a dataset-specific submission.
+`outputs/final_audit_report.md` is the run-specific checklist, including actual model status and scores, test output, and known limitations. Raw data, processed panels, forecasts, metrics, and other generated outputs are ignored by Git; the final audit report is explicitly included as a small submission artifact.
