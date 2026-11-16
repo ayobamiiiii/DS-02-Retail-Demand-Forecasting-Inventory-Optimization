@@ -1,0 +1,29 @@
+dataset: favorita
+data_dir: data/raw/favorita
+output_dir: outputs
+sample_items: 40
+stores: [1, 24, 37]
+chunksize: 1500000
+validation_days: 28
+random_seed: 41
+interval_level: 0.90
+model_comparison:
+  series_limit: 6
+  selection_days: 14
+  calibration_days: 14
+  evaluation_days: 28
+  prophet_iterations: 200
+  include_tft: false
+  tft_max_epochs: 1
+  tft_batch_size: 32
+  tft_train_batches: 2
+inventory:
+  # Transparent assumed cost units over the forecast replenishment horizon; replace with business inputs.
+  unit_holding_cost: 0.20
+  unit_stockout_cost: 2.00
+  service_level: 0.90
+  max_order: 2000
+  max_inventory: 5000
+  default_on_hand: 0
+  # Optional CSV columns: item_nbr,store_nbr,on_hand. No Favorita stock-on-hand file is supplied.
+  on_hand_file: null
