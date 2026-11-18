@@ -1,4 +1,5 @@
 .venv/
+.venv_old/
 venv/
 env/
 __pycache__/
@@ -41,3 +42,7 @@ outputs/**
 !.gitkeep
 !outputs/final_audit_report.md
 .mplconfig/
+
+# Local presentation build and render files
+.codex-presentation-build/
+.codex-presentation-output/

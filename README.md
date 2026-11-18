@@ -41,7 +41,7 @@ The project uses the [Corporación Favorita Grocery Sales Forecasting Kaggle com
 | `transactions.csv` | `date`, `store_nbr`, `transactions` | Store-level transaction counts |
 | `sample_submission.csv` | `id`, `unit_sales` | Kaggle submission template; not a training target |
 
-The active pipeline reads the large training CSV in chunks, ranks items by observed unit sales, and filters to the configured stores and item sample. It aggregates duplicate date-store-item sales, creates a daily series grid, fills absent sales days with zero, and joins metadata and auxiliary series. Sales are clipped at zero. Promotion values are normalized to Boolean. Oil is forward-filled with a fallback for leading missing values; transactions are forward-filled by store. Model features include target lags (1, 7, 14, and 28 days), prior-sales rolling means and standard deviation, calendar fields, promotions, holidays, lagged oil and transactions, and item/store metadata. Oil and transaction predictors use prior-day values; recursive forecasts feed predictions back into lag features.
+The active pipeline reads the large training CSV in chunks and ranks items using only nonnegative sales dated before the exclusive sample-selection cutoff (2017-06-21 for this run). That cutoff precedes the model-selection, calibration, and scored validation windows. It then filters to configured stores and the selected item sample. It aggregates duplicate date-store-item sales, creates a daily series grid, fills absent sales days with zero, and joins metadata and auxiliary series. Sales are clipped at zero. Promotion values are normalized to Boolean. Oil is forward-filled with a fallback for leading missing values; transactions are forward-filled by store. Model features include target lags (1, 7, 14, and 28 days), prior-sales rolling means and standard deviation, calendar fields, promotions, holidays, lagged oil and transactions, and item/store metadata. Oil and transaction predictors use prior-day values; recursive forecasts feed predictions back into lag features.
 
 The current processed panel covers 2013-01-02–2017-08-15: 195,692 rows, 116 item-store series, 39 items, and three stores in three provinces. The full raw data and processed panel are intentionally excluded from Git.
 
@@ -91,8 +91,8 @@ These are the active baseline metrics for 116 item-store series and 3,248 observ
 
 | Model | WAPE | RMSSE (mean) | RMSE |
 |---|---:|---:|---:|
-| Naive Weekly | 41.1774% | 0.704982 | 22.850307 |
-| LightGBM | 29.9650% | 0.683098 | 15.713903 |
+| Naive Weekly | 40.9416% | 0.691895 | 21.499179 |
+| LightGBM | 29.5346% | 0.648599 | 14.649477 |
 
 ### Common-sample comparison
 
@@ -105,11 +105,11 @@ This separate comparison evaluates the same six series and 168 held-out observat
 | Prophet | 20.9164% | 0.620779 | 39.298949 |
 | Darts Regression | 18.3903% | 0.552134 | 35.399453 |
 
-LightGBM had the lowest WAPE, RMSSE, and RMSE in both displayed comparisons. On the primary validation, its WAPE was 29.97% versus 41.18% for Naive Weekly. These are held-out results for the configured sample, not full-dataset or production estimates.
+LightGBM had the lowest WAPE, RMSSE, and RMSE in both displayed comparisons. On the primary validation, its WAPE was 29.53% versus 40.94% for Naive Weekly. These are held-out results for the configured sample, not full-dataset or production estimates.
 
 ### Prediction intervals
 
-The pipeline calibrates a symmetric, constant-width interval using a quantile of absolute residuals from the separate calibration window. Primary nominal 90% interval coverage was **90.12%** on the later 3,248-row holdout. The common-sample nominal 90% interval coverage was **93.45%** on 168 rows. This is empirical marginal coverage; it is not a conditional guarantee for every item, store, or horizon.
+The pipeline calibrates a symmetric, constant-width interval using a quantile of absolute residuals from the separate calibration window. Primary nominal 90% interval coverage was **90.42%** on the later 3,248-row holdout. The common-sample nominal 90% interval coverage was **93.45%** on 168 rows. This is empirical marginal coverage; it is not a conditional guarantee for every item, store, or horizon.
 
 ## 7. Inventory optimization
 
@@ -117,21 +117,21 @@ The pipeline calibrates a symmetric, constant-width interval using a quantile of
 
 Safety stock is `ceil(z × demand_std)`, where `z` is the normal quantile for the configured service level. Forecast uncertainty is estimated from calibration residuals and scaled by the square root of the forecast horizon, assuming independent daily errors. Defaults are a 90% service level, maximum order of 2,000 units, and maximum inventory of 5,000 units.
 
-Favorita does not supply on-hand stock or actual carrying and shortage costs. The current run assumes zero on-hand inventory unless an optional `item_nbr,store_nbr,on_hand` CSV is configured. It uses proxy costs of 0.20 per leftover unit and 2.00 per unmet unit, in generic cost units (not currency). These assumptions are configurable in `config/default.yaml`.
+Favorita does not supply on-hand stock or actual carrying and shortage costs. The current run assumes zero on-hand inventory unless an optional `item_nbr,store_nbr,on_hand` CSV is configured. It uses proxy costs of 0.20 per leftover unit and 2.00 per unmet unit, in generic cost units (not currency). The refreshed run returned 110 `OPTIMAL` recommendations: 54,814 units and 6,028.95 modeled cost units versus 82,453 units and 11,556.75 modeled cost units under the current policy (47.83% modeled reduction, not realized savings). These assumptions are configurable in `config/default.yaml`.
 
 Current generated run, 110 item-store recommendations:
 
 | Measure | Result |
 |---|---:|
 | Solver status | 110/110 `OPTIMAL` |
-| Recommended units | 56,580 |
-| Estimated holding cost | 1,108.50 cost units |
-| Estimated stockout cost | 5,020.00 cost units |
-| Optimized objective cost | 6,128.50 cost units |
-| Existing order-up-to policy | 85,375 units; 11,887.50 modeled cost units |
-| Modeled cost reduction | 48.45% under the configured scenarios and proxy costs |
+| Recommended units | 54,814 |
+| Estimated holding cost | 1,086.45 cost units |
+| Estimated stockout cost | 4,942.50 cost units |
+| Optimized objective cost | 6,028.95 cost units |
+| Existing order-up-to policy | 82,453 units; 11,556.75 modeled cost units |
+| Modeled cost reduction | 47.83% under the configured scenarios and proxy costs |
 
-The 48.45% figure is a modeled comparison against the existing policy under the same scenario assumptions. It is **not realized business savings**. Five recommendations hit the order cap and retain modeled shortage.
+The 47.83% figure is a modeled comparison against the existing policy under the same scenario assumptions. It is **not realized business savings**. Four recommendations hit the order cap and retain modeled shortage.
 
 ## 8. Interactive dashboard
 
@@ -167,9 +167,15 @@ Python 3.10+; pandas and NumPy for ingestion and feature preparation; scikit-lea
 │   └── default.yaml
 ├── dashboard/
 │   └── app.py
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── DS02_Final_Presentation.pptx
+│   ├── DATA_AND_API.md
+│   ├── DEMO_SCRIPT.md
+│   ├── INDIVIDUAL_REFLECTION.md
+│   └── PRESENTATION_SCRIPT.md
 ├── data/
 │   └── processed/.gitkeep         # raw and processed datasets are Git-ignored
-├── docs/
 ├── notebooks/
 │   ├── tft_colab.ipynb            # TFT handoff; training pending
 │   └── tft_dataset_manifest.json  # series IDs and split metadata
@@ -224,7 +230,7 @@ The pipeline writes forecasts, validation predictions, metrics, hierarchy rollup
 
 ## 12. Testing and validation
 
-The last recorded full run reported **16 tests passed**: 10 inventory optimization tests, three lagged-covariate/future-origin tests, one hierarchy test, and two dashboard route/callback tests. The final audit also records successful compilation, `pip check`, solver statuses, and interval coverage.
+The latest full run reported **20 tests passed**: 10 inventory optimization tests, three lagged-covariate/future-origin tests, one hierarchy test, two dashboard route/callback tests, and four sample-selection cutoff tests. The final audit also records successful compilation, `pip check`, solver statuses, and interval coverage.
 
 Run the project checks locally:
 
@@ -240,6 +246,7 @@ See [`outputs/final_audit_report.md`](outputs/final_audit_report.md) for the det
 
 - **TFT is pending GPU training.** The notebook and exact 116-series export are prepared; no TFT score is available. Run the notebook on Colab T4, confirm its execution report says `success`, then compare only its saved held-out predictions.
 - The model results cover 116 item-store series from 39 items and three stores, not all Favorita stores or all product-item series. The completed Prophet/Darts comparison uses only six common series.
+- Sample membership is selected from nonnegative unit sales dated before 2017-06-21, an exclusive cutoff before the selection (June 21–July 4), calibration (July 5–18), and evaluation (July 19–August 15) windows. Tests verify that sales on or after the cutoff cannot change item or common-series selection.
 - The available data is Favorita in Ecuador; Walmart M5 data and M5 evaluation are not part of this project.
 - Favorita does not provide on-hand inventory, real purchase costs, holding costs, shortage penalties, or realized lost sales. Current replenishment and savings figures depend on configurable assumptions.
 - The interval is a constant-width empirical residual interval. Broader rolling-origin calibration and segment-level coverage checks would strengthen its reliability assessment.

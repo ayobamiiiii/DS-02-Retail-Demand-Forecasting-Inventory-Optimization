@@ -38,15 +38,34 @@ def _future_exog(testday,panel,items,stores,oil,holidays,transactions):
     x=x.merge(last_tx,on="store_nbr",how="left"); x["transactions_lag_1"]=x.transactions_lag_1.fillna(0); x["unit_sales"]=0.0
     return x
 
+def selection_cutoff_from_test_start(test_start,config):
+    """Return the earliest exclusive date for all evaluation-window sample choice."""
+    test_start=pd.Timestamp(test_start)
+    primary_start=test_start-pd.Timedelta(days=int(config.get("validation_days",28)))
+    comparison=config.get("model_comparison",{})
+    comparison_start=test_start-pd.Timedelta(days=sum(int(comparison.get(k,default)) for k,default in
+        (("evaluation_days",28),("calibration_days",14),("selection_days",14))))
+    return min(primary_start,comparison_start)
+
 def run(config):
     out=Path(config.get("output_dir","outputs")); root=Path(config.get("data_dir","data/raw/favorita"))
     for sub in ("figures","forecasts","metrics","recommendations","models"): (out/sub).mkdir(parents=True,exist_ok=True)
     cache=Path("data/processed/favorita_panel.csv")
+    test_dates=pd.read_csv(root/"test.csv",usecols=["date"],parse_dates=["date"]).date
+    test_start=pd.Timestamp(test_dates.min())
+    selection_cutoff=selection_cutoff_from_test_start(test_start,config)
+    panel_manifest=cache.with_suffix(".manifest.json")
+    expected_manifest={"selection_cutoff_exclusive":str(selection_cutoff.date()),
+      "sample_items":int(config.get("sample_items",40)),"stores":sorted(config.get("stores",[1,2,3]))}
     panel=None
-    if cache.exists() and config.get("reuse_processed_panel",True):
+    if cache.exists() and panel_manifest.exists() and config.get("reuse_processed_panel",True):
         cached=pd.read_csv(cache,parse_dates=["date"])
         requested=set(config.get("stores",[1,2,3]))
-        if set(cached.store_nbr.unique())==requested: panel=cached
+        try: prior_manifest=json.loads(panel_manifest.read_text())
+        except (OSError,json.JSONDecodeError): prior_manifest={}
+        if (set(cached.store_nbr.unique())==requested and
+            all(prior_manifest.get(k)==v for k,v in expected_manifest.items()) and
+            set(cached.item_nbr.unique())==set(prior_manifest.get("selected_items",[]))): panel=cached
     if panel is not None:
         test=pd.read_csv(root/"test.csv",usecols=["date","store_nbr","item_nbr","onpromotion"],parse_dates=["date"],dtype={"onpromotion":"string"})
         test["onpromotion"]=test.onpromotion.astype("string").str.lower().map({"true":True,"false":False,"1":True,"0":False}).fillna(False)
@@ -55,10 +74,11 @@ def run(config):
         oil=pd.read_csv(root/"oil.csv",parse_dates=["date"]); holidays=pd.read_csv(root/"holidays_events.csv",parse_dates=["date"])
         transactions=pd.read_csv(root/"transactions.csv",parse_dates=["date"])
     else:
-        train,test,items,stores,oil,holidays,transactions=load_favorita(root,config.get("sample_items",40),config.get("stores",[1,2,3]),config.get("chunksize",1_500_000))
+        train,test,items,stores,oil,holidays,transactions=load_favorita(root,config.get("sample_items",40),config.get("stores",[1,2,3]),config.get("chunksize",1_500_000),selection_cutoff)
         panel=make_daily_panel(train,items,stores,oil,holidays,transactions,config.get("stores",[1,24,37]))
     panel=add_lagged_covariates(panel,transactions)
     panel.to_csv(cache,index=False)
+    panel_manifest.write_text(json.dumps({**expected_manifest,"selected_items":sorted(map(int,panel.item_nbr.unique()))},indent=2))
     profile={"dataset":"Corporación Favorita Grocery Sales Forecasting","nonzero_sales_panel_days":int((panel.unit_sales>0).sum()),"panel_rows":int(len(panel)),
       "series":int(panel.id.nunique()),"items":int(panel.item_nbr.nunique()),"stores":int(panel.store_nbr.nunique()),
       "states":int(panel.state.nunique()),"date_min":str(panel.date.min().date()),"date_max":str(panel.date.max().date()),

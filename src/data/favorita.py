@@ -9,18 +9,24 @@ def _require(root):
     missing=[name for name in FILES if not (root/name).exists()]
     if missing: raise FileNotFoundError(f"Favorita files missing from {root}: {', '.join(missing)}")
 
-def choose_items(train_path, n_items=40, chunksize=1_500_000):
-    """Rank item IDs by total observed unit sales without holding the raw file in RAM."""
+def choose_items(train_path, n_items=40, chunksize=1_500_000, before_date=None):
+    """Rank items using only rows dated before the exclusive selection cutoff."""
+    if before_date is None:
+        raise ValueError("before_date is required to prevent evaluation-period sample-selection leakage")
+    cutoff = pd.Timestamp(before_date)
     totals={}
-    for chunk in pd.read_csv(train_path,usecols=["item_nbr","unit_sales"],chunksize=chunksize):
+    for chunk in pd.read_csv(train_path,usecols=["date","item_nbr","unit_sales"],parse_dates=["date"],chunksize=chunksize):
+        chunk = chunk[chunk.date < cutoff]
+        if chunk.empty:
+            continue
         chunk["unit_sales"]=pd.to_numeric(chunk.unit_sales,errors="coerce").fillna(0).clip(lower=0)
         sums=chunk.groupby("item_nbr",sort=False).unit_sales.sum()
         for k,v in sums.items(): totals[k]=totals.get(k,0.0)+float(v)
     return [k for k,_ in sorted(totals.items(),key=lambda kv:kv[1],reverse=True)[:int(n_items)]]
 
-def load_favorita(data_dir, n_items=40, stores=None, chunksize=1_500_000):
+def load_favorita(data_dir, n_items=40, stores=None, chunksize=1_500_000, selection_cutoff=None):
     root=Path(data_dir); _require(root)
-    selected=choose_items(root/"train.csv",n_items,chunksize)
+    selected=choose_items(root/"train.csv",n_items,chunksize,selection_cutoff)
     stores=list(stores or [1,2,3])
     parts=[]
     for ch in pd.read_csv(root/"train.csv",usecols=USE,chunksize=chunksize,parse_dates=["date"],dtype={"onpromotion":"string"}):

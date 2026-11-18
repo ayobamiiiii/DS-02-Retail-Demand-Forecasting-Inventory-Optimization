@@ -1,95 +1,86 @@
 # Final Project Audit — Favorita Forecasting and Inventory Planning
 
-**Audit date:** 2026-11-16
-
-**Workspace:** `/Users/mac/Documents/Codex/2026-11-14/files-pasted-by-the-user-project`
-**Dataset:** Corporación Favorita Grocery Sales Forecasting (the M5 source files are not present)
+**Audit date:** 2026-11-18
+**Workspace:** `/Users/mac/Developer/retail-demand-forecasting`
+**Dataset:** Corporación Favorita Grocery Sales Forecasting (not Walmart M5)
 
 ## Executive result
 
-The Favorita pipeline completed from the existing project. Naive Weekly, LightGBM, Prophet, and Darts ran and were compared on the same six series and the same untouched evaluation dates. The separate primary baseline run evaluates 116 series. Both use chronological selection, calibration, and evaluation periods. The model comparison dashboard reads the generated JSON/CSV outputs dynamically. The OR-Tools optimizer returned `OPTIMAL` for all 110 current recommendation rows. All 16 tests pass, including dashboard tab smoke checks.
+The item and benchmark-series selectors now use only sales dated before the earliest configured evaluation window. For this run, the exclusive cutoff is **2017-06-21**; it precedes model selection (June 21–July 4), calibration (July 5–18), and held-out evaluation (July 19–August 15). A cache provenance manifest records the cutoff and selected IDs, and unmanifested or mismatched caches are rebuilt. Four regression tests cover the explicit cutoff, post-cutoff independence for item and series ranking, and derived cutoff dates.
 
-TFT is implemented and was genuinely attempted with PyTorch Forecasting. Its dependencies imported, but the bounded CPU attempt did not return during the earlier audit run. Apple MPS is built into the Torch package but reports unavailable on this Mac. A minimal Google Colab GPU notebook and exact 116-series data export are now prepared; the Colab training has not been run, so TFT is still not scored or represented as successfully evaluated.
+The pipeline was rerun successfully from the corrected sample. Naive Weekly, LightGBM, Prophet, and Darts Regression have actual held-out predictions and refreshed metrics. Metrics were independently recomputed from the saved prediction CSVs using the project scoring function. OR-Tools returned `OPTIMAL` for all 110 recommendations. All 20 automated tests pass, including callbacks for all six dashboard tabs. TFT remains **pending GPU training**; no TFT prediction or score is claimed.
 
 ## Requirements audit
 
-| Assignment requirement | Status | Evidence / result |
+| Requirement | Status | Evidence / result |
 |---|---|---|
-| Forecast models and actual validation metrics | **Complete with limitation** | Naive Weekly and LightGBM scored on the 116-series primary holdout. Prophet and Darts each ran in all benchmark windows and were scored with the same six-series common holdout as Naive/LightGBM. Colab TFT notebook/data handoff is prepared, but GPU training has not completed and has no score. |
-| Chronological train/validation separation and leakage prevention | **Complete** | Selection: 2017-06-21–2017-07-04; calibration: 2017-07-05–2017-07-18; untouched evaluation: 2017-07-19–2017-08-15. Sales lags and store covariates use prior-day information; recursive forecasts use generated predictions. Promotion and calendar inputs are known-ahead data. |
-| Hierarchical reconciliation | **Complete** | Generated bottom-up rollups at item-store, item, store, city, state, and overall levels. The hierarchy test passes; current output contains 2,512 rows over all six levels. |
-| Prediction intervals and coverage | **Complete, empirical** | Absolute residual quantiles calibrated on the separate 14-day calibration period. Primary 116-series holdout coverage: 90.12% (nominal 90%, 3,248 observations). Common six-series selected-model coverage: 93.45% (168 observations). Coverage is measured only on the later untouched block. |
-| OR-Tools optimization and all tests | **Complete** | 110/110 recommendations have `OPTIMAL` status. Ten inventory tests cover zero/sufficient stock, high demand, order and inventory bounds, cost tradeoffs, service levels, invalid inputs, and solver optimality versus brute force. All 16 project tests pass. |
-| Six dashboard tabs | **Complete** | Home route and callback smoke checks pass for Executive Overview, Sales Trends, Demand Forecasts, Model Performance, Inventory Optimization, and Store and Item Analysis. This is Flask test-client/callback verification, not browser visual QA. |
-| Dataset assumptions and limitations | **Complete** | Favorita is explicitly identified as the available alternative. The sample, no-stock/no-cost data limitations, proxy cost units, safety-stock assumptions, and interval limits are documented. |
-| README and requirements | **Complete** | README covers project/problem, data, architecture, stack, setup, execution, model scores, inventory method, assumptions, and dashboard instructions. Requirements install in the checked environment; `pip check` passes. |
-| Architecture diagram | **Complete** | README has a Mermaid diagram from raw data through evaluation, rollups, OR-Tools, outputs, and Dash. |
-| GitHub readiness | **Complete locally** | Project-local Git repository initialized, `.gitignore` excludes datasets, generated outputs, credentials, model files, and virtual environments, and a clean initial source/documentation commit was created. No remote is configured and no push was performed. |
+| Forecast models and validation metrics | **Complete with scope limits** | Naive Weekly and LightGBM primary evaluation use 116 series/3,248 observations. Naive Weekly, LightGBM, Prophet and Darts use a common six-series/168-observation holdout. |
+| Chronological separation and sample selection | **Complete for configured run** | Exclusive sample-selection cutoff 2017-06-21; selection June 21–July 4; calibration July 5–18; final evaluation July 19–August 15. Selectors and cache manifest enforce the boundary; tests verify future sales cannot affect membership. |
+| Hierarchical rollups | **Complete** | Generated bottom-up rollups at item-store, item, store, city, state, and overall levels. Hierarchy tests pass. |
+| Prediction intervals | **Complete, empirical** | Separate 14-day residual calibration followed by untouched 28-day evaluation. Primary 90% interval coverage is 90.4249% (3,248 rows); common-sample coverage is 93.4524% (168 rows). |
+| OR-Tools inventory recommendations | **Complete for modeled assumptions** | 110/110 statuses are `OPTIMAL`; four order quantities reach the configured cap. Cost inputs and zero on-hand assumption are proxies. |
+| Automated tests | **Complete** | 20 tests pass, including inventory edge cases, hierarchy, lag/covariate checks, cutoff tests, and dashboard callbacks/routes. |
+| Six-tab dashboard | **Complete locally** | Automated callback checks cover Executive Overview, Sales Trends, Demand Forecasts, Model Performance, Inventory Optimization, and Store and Item Analysis. Local app route and layout are also verified. |
+| README, setup, architecture, data/API docs | **Complete locally** | README setup and execution, architecture diagram, data/API contracts, and audit report reflect this run. |
+| Demo, presentation, reflection | **Prepared; owner action remains** | Six-tab screen-recording script and 10-minute deck/script are present. There is no hosted deployment or saved screen recording. Reflection includes prompts for personal details only the owner can confirm. |
+| TFT | **Pending GPU training** | Notebook/export are prepared for the corrected 116-series sample. Colab GPU training has not completed and TFT is excluded from all model comparisons. |
+| GitHub publication | **Not pushed** | Local work only; no push was performed as requested. |
 
 ## Model metrics
 
-### Primary pipeline validation
-
-The primary one-day-ahead metrics are computed from held-out predictions for 116 item-store series, 3,248 observations, over 2017-07-19–2017-08-15. Training history for metric scaling ends before the holdout. LightGBM was selected on the earlier selection window, not on this scored holdout.
+### Primary rolling holdout: 116 series, 3,248 rows
 
 | Model | WAPE | RMSSE (mean per series) | RMSE |
 |---|---:|---:|---:|
-| Naive Weekly | 41.1774% | 0.704982 | 22.850307 |
-| LightGBM | 29.9650% | 0.683098 | 15.713903 |
+| Naive Weekly | 40.9416% | 0.691895 | 21.499179 |
+| LightGBM | 29.5346% | 0.648599 | 14.649477 |
 
-Primary interval: calibrated 2017-07-05–2017-07-18; evaluated 2017-07-19–2017-08-15; radius 20.421784 units; observed coverage 90.1170% over 3,248 rows.
+The scored dates are 2017-07-19–2017-08-15. One-day-ahead predictions use actual target history through the previous date. LightGBM was selected using the earlier selection block, not the scored holdout. The primary interval was calibrated July 5–18, with radius 19.479636 sales units and 90.4249% empirical coverage on the later holdout.
 
-### Common-sample model comparison
-
-These scores come from the same six item-store series and 168 observations (28 dates) for every executed model. Selection and calibration each use 84 observations over 14 days. Model selection uses WAPE from 2017-06-21–2017-07-04; the final evaluation is 2017-07-19–2017-08-15.
+### Common comparison: six series, 168 rows
 
 | Model | WAPE | RMSSE (mean per series) | RMSE |
 |---|---:|---:|---:|
-| Naive Weekly | 24.7320% | 0.772054 | 51.084838 |
 | LightGBM | 15.6490% | 0.470417 | 29.465924 |
-| Prophet | 20.9164% | 0.620779 | 39.298949 |
 | Darts Regression | 18.3903% | 0.552134 | 35.399453 |
+| Prophet | 20.9164% | 0.620779 | 39.298949 |
+| Naive Weekly | 24.7320% | 0.772054 | 51.084838 |
 
-LightGBM had the lowest selection WAPE and was therefore used for the calibrated interval. The 90% interval reached 93.4524% coverage on the untouched final period (168 rows). Prophet uses a per-series fit. Darts uses the Darts autoregressive `RegressionModel` with 28 lags and a shared Ridge estimator; Darts executed in selection, calibration, and evaluation. Darts 0.41 emitted a deprecation warning for `RegressionModel`, but the model ran successfully.
+All models use the same six series and 28 evaluation dates. LightGBM has the lowest metrics in this sample. The separate 90% interval has 93.4524% coverage. Common-sample and primary scores have different item-series scopes and should not be compared directly.
 
-### TFT execution record
-
-The local compact PyTorch Forecasting TFT path was attempted on six series, but it did not return during that audit; MPS was unavailable and no dependency exception was observed. For the final handoff, `notebooks/tft_colab.ipynb` now uses the exact primary 116-series split and a T4-sized architecture (hidden size 8, two heads, batch 32, up to 15 epochs with early stopping). Its dataset export retains real history, marks `unit_sales` as the unknown target, and evaluates the same rolling one-step validation observations. The Colab run has not yet occurred. TFT remains excluded from all scored comparisons; no TFT metric or prediction is claimed.
-
-## Inventory optimization
-
-Current run outputs (110 item-store recommendations):
+## Inventory optimization outputs
 
 | Measure | Actual output |
 |---|---:|
 | Solver status | 110 `OPTIMAL` |
-| Recommended units | 56,580 |
-| Estimated holding cost | 1,108.50 cost units |
-| Estimated stockout cost | 5,020.00 cost units |
-| Optimized total objective cost | 6,128.50 cost units |
-| Current policy units | 85,375 |
-| Current policy objective cost | 11,887.50 cost units |
-| Modeled cost reduction vs current policy | 48.45% |
+| Recommended order units | 54,814 |
+| Estimated holding cost | 1,086.45 generic cost units |
+| Estimated stockout cost | 4,942.50 generic cost units |
+| Optimized objective cost | 6,028.95 generic cost units |
+| Current policy order units | 82,453 |
+| Current policy objective cost | 11,556.75 generic cost units |
+| Modeled reduction vs current policy | 47.83% |
 
-The OR-Tools objective balances expected holding and shortage costs under low/median/high demand scenarios (25%/50%/25%). Safety stock uses the configured 90% service level and calibration residual variation scaled by the square root of forecast horizon. Default on-hand is zero because Favorita does not provide inventory. Holding cost 0.20 per excess unit and stockout cost 2.00 per unmet unit are declared proxy cost units, not real currency or observed business costs. The modeled reduction is conditional on those assumptions.
+The CP-SAT objective weights low/median/high demand scenarios 25%/50%/25%; safety stock uses the configured 90% service level and calibration-residual uncertainty scaled by the square root of the 16-day horizon. Favorita contains no on-hand stock or actual cost inputs. The run assumes zero stock and proxy costs of 0.20 per leftover unit and 2.00 per unmet unit. The reduction is modeled only and is not realized business savings.
+
+## Dataset and changed sample
+
+The processed panel contains 195,692 rows from 2013-01-02 through 2017-08-15, 39 items, 116 item-store series, and stores 1, 24, and 37. The profile has zero missing values and duplicate series-day keys. The pre-cutoff item sample is selected using sales through 2017-06-20 only. Compared with the previous sample, item 1503847 was replaced by item 273528; the panel size and series count are unchanged. The local TFT CSV and tracked manifest were regenerated to match the corrected primary sample and preserve the same validation period.
 
 ## Test and verification results
 
-- `python -m unittest discover -s tests -v`: **16 passed**, 0 failures (including 10 inventory tests, hierarchy/leakage tests, and 2 dashboard tests).
-- Dashboard home endpoint: HTTP 200; all six tab callbacks returned content.
-- `python -m compileall -q src dashboard app.py tests`: passed.
-- `python -m pip check`: `No broken requirements found`.
-- `git diff --check`: passed before initial commit.
-- Pipeline rerun: completed; wrote 1,760 forecast rows for 110 item-store pairs and 16 official test dates; wrote 110 inventory recommendations.
-- Dataset profile: 195,692 panel rows; 116 series, 39 items, 3 stores, 3 states; 2013-01-02–2017-08-15; zero missing values in the generated panel and zero duplicate series-date keys.
-- Hierarchy levels in generated output: item-store, item, store, city, state, overall.
+- `./.venv/bin/python -m unittest discover -s tests -v`: **20 passed, 0 failed**.
+- The selection-specific suite includes four checks for explicit and derived cutoff behavior and post-cutoff independence.
+- Dashboard tests: home route and all six tab callbacks returned successfully.
+- Pipeline: completed with exit code 0 using `MPLBACKEND=Agg` and a writable `MPLCONFIGDIR`; generated 1,760 official-test forecast rows and 110 recommendations.
+- Saved primary and common-sample metrics were independently recomputed from held-out CSV predictions and agree with the JSON outputs to floating-point precision.
+- TFT remains untrained; no metric or prediction artifact is reported.
 
-## Partial and missing requirements / limitations
+## Remaining limitations and next steps
 
-1. **TFT evaluation remains incomplete.** Code and dependencies are present and a constrained CPU attempt was made. MPS is unavailable; the CPU call did not finish within this audit run, so no TFT metric is reported.
-2. **M5-specific validation is unavailable.** M5 files were not supplied; this project uses the Favorita alternative and does not claim M5 results.
-3. **Sample scope is limited.** The primary model metrics use 116 series (39 items across stores 1, 24, and 37); Prophet/Darts common comparison uses six series to keep per-series and CPU experiments manageable. Results are not full-dataset estimates.
-4. **Intervals are marginal empirical residual intervals.** They have a separate calibration block and untouched evaluation block but do not guarantee conditional coverage by item, store, or forecast horizon.
-5. **Inventory costs and stock are assumptions.** The dataset contains neither on-hand stock nor actual holding/stockout economics. Replace defaults before operational use.
-6. **Darts API warning.** The Darts 0.41 `RegressionModel` API used in the successful run is deprecated upstream; the current run succeeded, but a future Darts upgrade may require migrating to `SKLearnModel`.
-7. **GitHub publication is not complete by design.** The local initial commit exists; there is no remote URL, and nothing was pushed. Add a real repository URL and authorize a push when ready.
+1. Run the prepared TFT notebook on Colab GPU and add it to comparisons only after successful checkpoint, predictions, metrics, and execution report are saved.
+2. The evaluated sample is limited to 39 items and three of Favorita's stores; the Prophet/Darts benchmark is further limited to six series.
+3. Inventory quantities use zero default on-hand stock and assumed generic costs; replace them with business-approved stock, lead time, capacity, holding, and shortage inputs before operational interpretation.
+4. Interval coverage is empirical and marginal; assess more rolling origins and coverage by item/store.
+5. The dashboard is verified locally. Record the scripted demo or deploy it through an approved host for submission.
+6. Review the individual reflection prompts and add personal details that cannot be established from repository evidence.

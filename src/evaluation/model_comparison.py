@@ -16,8 +16,11 @@ from src.models.tft import predict_tft
 PREDICTION_COLUMNS={"naive_weekly":"prediction_naive_weekly","lightgbm":"prediction_lightgbm",
                     "prophet":"prediction_prophet","darts_regression":"prediction_darts_regression","tft":"prediction_tft"}
 
-def _choose_common_ids(panel,limit):
-    totals=panel.groupby(["store_nbr","id"],as_index=False,observed=True).unit_sales.sum()
+def _choose_common_ids(panel,limit,selection_cutoff):
+    """Choose benchmark series by pre-selection-period sales only."""
+    cutoff=pd.Timestamp(selection_cutoff)
+    eligible=panel[panel.date < cutoff]
+    totals=eligible.groupby(["store_nbr","id"],as_index=False,observed=True).unit_sales.sum()
     stores=sorted(totals.store_nbr.unique()); per_store=max(1,int(np.ceil(int(limit)/max(len(stores),1))))
     selected=[]
     for store in stores:
@@ -87,7 +90,7 @@ def run_model_comparison(panel,config,output_dir="outputs"):
     selection_start=calibration_start-pd.Timedelta(days=selection_days)
     selection_end=calibration_start-pd.Timedelta(days=1); calibration_end=eval_start-pd.Timedelta(days=1)
     if selection_start<=panel.date.min()+pd.Timedelta(days=60): raise ValueError("Insufficient history for requested selection/calibration/evaluation windows")
-    ids=_choose_common_ids(panel,cfg.get("series_limit",12))
+    ids=_choose_common_ids(panel,cfg.get("series_limit",12),selection_start)
     models=["naive_weekly","lightgbm","prophet","darts_regression"]
     include_tft=cfg.get("include_tft",True)
     if include_tft: models.append("tft")
