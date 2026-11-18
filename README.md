@@ -4,6 +4,14 @@
 
 This project builds a multi-store daily demand forecasting and replenishment workflow using the Corporación Favorita Kaggle grocery-sales data. It combines chronological model evaluation, coherent store and product rollups, empirical prediction intervals, OR-Tools inventory optimization, and a six-tab Plotly Dash dashboard.
 
+## Author & Contact
+
+**Misbaudeen Abdurrahman**
+
+- **GitHub:** [ayobamiiiii](https://github.com/ayobamiiiii)
+- **Project Repository:** [retail-demand-forecasting](https://github.com/ayobamiiiii/retail-demand-forecasting)
+- **LinkedIn:** [Misbaudeen Abdurrahman](https://www.linkedin.com/in/misbaudeen-abdurrahman-67723121a)
+
 > **Dataset scope:** The code is organized around a nationwide retail planning problem, but the verified run is a bounded sample of Favorita in Ecuador: 39 items, 116 item-store series, and three stores across three provinces. It is not a full-network or nationwide evaluation, and the data is Favorita—not Walmart M5.
 
 ## 1. Project overview
@@ -237,17 +245,5 @@ See [`outputs/final_audit_report.md`](outputs/final_audit_report.md) for the det
 - The interval is a constant-width empirical residual interval. Broader rolling-origin calibration and segment-level coverage checks would strengthen its reliability assessment.
 - The Darts 0.41 `RegressionModel` used in the executed comparison is deprecated upstream; a future dependency upgrade may require the Darts `SKLearnModel` API.
 - Production extensions could add full-network training, store/item cross-validation, stock and lead-time data, service-level monitoring, forecast drift checks, CI, and automated retraining.
-
-## 14. Author and project information
-
-**Project:** DS-02 — Nationwide Demand Forecasting and Inventory Optimization
-
-**Dataset:** Corporación Favorita Grocery Sales Forecasting (Kaggle)
-
-**Author:** Misbaudeen Abdurrahman
-
-**GitHub:** _[Add GitHub profile URL]_
-
-**LinkedIn:** [Misbaudeen Abdurrahman](https://www.linkedin.com/in/misbaudeen-abdurrahman-67723121a/)
 
 This repository presents an applied forecasting and optimization case study. The implementation and results should be read in the context of the bounded Favorita sample and the documented inventory assumptions.
