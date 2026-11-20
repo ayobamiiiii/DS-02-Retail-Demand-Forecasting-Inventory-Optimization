@@ -172,7 +172,6 @@ Python 3.10+; pandas and NumPy for ingestion and feature preparation; scikit-lea
 │   ├── DS02_Final_Presentation.pptx
 │   ├── DATA_AND_API.md
 │   ├── DEMO_SCRIPT.md
-│   ├── INDIVIDUAL_REFLECTION.md
 │   └── PRESENTATION_SCRIPT.md
 ├── data/
 │   └── processed/.gitkeep         # raw and processed datasets are Git-ignored
@@ -230,7 +229,7 @@ The pipeline writes forecasts, validation predictions, metrics, hierarchy rollup
 
 ## 12. Testing and validation
 
-The latest full run reported **24 tests passed**: 10 inventory optimization tests, three lagged-covariate/future-origin tests, one hierarchy test, six dashboard route/view tests, and four sample-selection cutoff tests. The final audit also records successful compilation, `pip check`, solver statuses, and interval coverage.
+The latest local verification on 2026-11-20 reported **26 tests passed**: 10 inventory optimization tests, three lagged-covariate/future-origin tests, one hierarchy test, eight dashboard route/view/callback tests, and four sample-selection cutoff tests. The same verification compiled the Python modules, passed `pip check`, loaded the dashboard route, reran the configured pipeline, and recomputed the saved metrics from held-out predictions.
 
 Run the project checks locally:
 
@@ -242,15 +241,9 @@ python -m pip check
 
 See [`outputs/final_audit_report.md`](outputs/final_audit_report.md) for the detailed run-specific evidence and limitations.
 
-## 13. Limitations and future improvements
+## 13. Limitations
 
-- **TFT is pending GPU training.** The notebook and exact 116-series export are prepared; no TFT score is available. Run the notebook on Colab T4, confirm its execution report says `success`, then compare only its saved held-out predictions.
-- The model results cover 116 item-store series from 39 items and three stores, not all Favorita stores or all product-item series. The completed Prophet/Darts comparison uses only six common series.
-- Sample membership is selected from nonnegative unit sales dated before 2017-06-21, an exclusive cutoff before the selection (June 21–July 4), calibration (July 5–18), and evaluation (July 19–August 15) windows. Tests verify that sales on or after the cutoff cannot change item or common-series selection.
-- The available data is Favorita in Ecuador; Walmart M5 data and M5 evaluation are not part of this project.
-- Favorita does not provide on-hand inventory, real purchase costs, holding costs, shortage penalties, or realized lost sales. Current replenishment and savings figures depend on configurable assumptions.
-- The interval is a constant-width empirical residual interval. Broader rolling-origin calibration and segment-level coverage checks would strengthen its reliability assessment.
-- The Darts 0.41 `RegressionModel` used in the executed comparison is deprecated upstream; a future dependency upgrade may require the Darts `SKLearnModel` API.
-- Production extensions could add full-network training, store/item cross-validation, stock and lead-time data, service-level monitoring, forecast drift checks, CI, and automated retraining.
-
-This repository presents an applied forecasting and optimization case study. The implementation and results should be read in the context of the bounded Favorita sample and the documented inventory assumptions.
+- **TFT training and final held-out evaluation were not completed.** A Colab Tesla T4 selection run completed, but final training encountered CUDA deterministic-operation and PyTorch Forecasting/Lightning scheduler compatibility errors. Scheduler handling was adjusted, but subsequent attempts were constrained by Colab GPU usage limits. No TFT metrics or predictions are claimed.
+- The evaluated sample is limited to 39 items and three Favorita stores; the Prophet/Darts benchmark is further limited to six series.
+- Inventory quantities use zero-default on-hand stock and assumed generic costs. Business-approved stock, lead-time, capacity, holding, and shortage inputs are needed before operational interpretation.
+- Prediction-interval coverage is empirical and limited.

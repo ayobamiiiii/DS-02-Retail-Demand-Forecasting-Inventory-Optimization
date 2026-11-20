@@ -46,3 +46,7 @@ outputs/**
 # Local presentation build and render files
 .codex-presentation-build/
 .codex-presentation-output/
+
+# Local-only submission materials
+submission/
+docs/INDIVIDUAL_REFLECTION.md

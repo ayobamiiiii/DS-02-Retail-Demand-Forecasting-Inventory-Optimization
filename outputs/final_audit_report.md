@@ -1,14 +1,14 @@
 # Final Project Audit — Favorita Forecasting and Inventory Planning
 
-**Audit date:** 2026-11-18
-**Workspace:** `/Users/mac/Developer/retail-demand-forecasting`
+**Audit date:** 2026-11-20
+**Repository:** project checkout (commands and paths are relative to its root)
 **Dataset:** Corporación Favorita Grocery Sales Forecasting (not Walmart M5)
 
 ## Executive result
 
 The item and benchmark-series selectors now use only sales dated before the earliest configured evaluation window. For this run, the exclusive cutoff is **2017-06-21**; it precedes model selection (June 21–July 4), calibration (July 5–18), and held-out evaluation (July 19–August 15). A cache provenance manifest records the cutoff and selected IDs, and unmanifested or mismatched caches are rebuilt. Four regression tests cover the explicit cutoff, post-cutoff independence for item and series ranking, and derived cutoff dates.
 
-The pipeline was rerun successfully from the corrected sample. Naive Weekly, LightGBM, Prophet, and Darts Regression have actual held-out predictions and refreshed metrics. Metrics were independently recomputed from the saved prediction CSVs using the project scoring function. OR-Tools returned `OPTIMAL` for all 110 recommendations. All 24 automated tests pass, including focused checks for each dashboard view and callbacks for all six tabs. TFT remains **pending GPU training**; no TFT prediction or score is claimed.
+The pipeline was rerun successfully from the corrected sample during this audit. Naive Weekly, LightGBM, Prophet, and Darts Regression have actual held-out predictions and refreshed metrics. Metrics were independently recomputed from the saved prediction CSVs using the project scoring function. OR-Tools returned `OPTIMAL` for all 110 recommendations. All 26 automated tests pass, including dashboard callback checks for all six tabs. TFT remains **pending GPU training and held-out evaluation**; no TFT prediction or score is claimed.
 
 ## Requirements audit
 
@@ -19,12 +19,11 @@ The pipeline was rerun successfully from the corrected sample. Naive Weekly, Lig
 | Hierarchical rollups | **Complete** | Generated bottom-up rollups at item-store, item, store, city, state, and overall levels. Hierarchy tests pass. |
 | Prediction intervals | **Complete, empirical** | Separate 14-day residual calibration followed by untouched 28-day evaluation. Primary 90% interval coverage is 90.4249% (3,248 rows); common-sample coverage is 93.4524% (168 rows). |
 | OR-Tools inventory recommendations | **Complete for modeled assumptions** | 110/110 statuses are `OPTIMAL`; four order quantities reach the configured cap. Cost inputs and zero on-hand assumption are proxies. |
-| Automated tests | **Complete** | 24 tests pass, including inventory edge cases, hierarchy, lag/covariate checks, cutoff tests, and dashboard view/callback checks. |
+| Automated tests | **Complete** | 26 tests pass, including inventory edge cases, hierarchy, lag/covariate checks, cutoff tests, and dashboard view/callback checks. |
 | Six-tab dashboard | **Complete locally** | Automated callback checks cover Executive Overview, Sales Trends, Demand Forecasts, Model Performance, Inventory Optimization, and Store and Item Analysis. Local app route and layout are also verified. |
 | README, setup, architecture, data/API docs | **Complete locally** | README setup and execution, architecture diagram, data/API contracts, and audit report reflect this run. |
-| Demo, presentation, reflection | **Prepared; owner action remains** | Six-tab screen-recording script and 10-minute deck/script are present. There is no hosted deployment or saved screen recording. Reflection includes prompts for personal details only the owner can confirm. |
-| TFT | **Pending GPU training** | Notebook/export are prepared for the corrected 116-series sample. Colab GPU training has not completed and TFT is excluded from all model comparisons. |
-| GitHub publication | **Not pushed** | Local work only; no push was performed as requested. |
+| TFT | **Pending training and held-out evaluation** | I attempted a Colab Tesla T4 run. A selection stage completed, but final refit/evaluation did not: the attempts encountered CUDA deterministic-operation and PyTorch Forecasting/Lightning scheduler configuration incompatibilities, and later retries were constrained by Colab GPU usage limits. The notebook was updated for scheduler compatibility, but no final checkpoint, TFT metrics, or predictions are claimed; TFT is excluded from all model comparisons. |
+| GitHub repository | **Local removal prepared; remote update pending** | `origin` points to the intended repository; `main` matched `origin/main` at `b0db367` before this review. The local index now removes the reflection path and `.gitignore` excludes both reflection locations. Because no commit or push was made, the remote still contains the previously committed file until a future removal commit is pushed; earlier history was not rewritten. |
 
 ## Model metrics
 
@@ -69,18 +68,22 @@ The processed panel contains 195,692 rows from 2013-01-02 through 2017-08-15, 39
 
 ## Test and verification results
 
-- `./.venv/bin/python -m unittest discover -s tests -v`: **24 passed, 0 failed**.
+- `./.venv/bin/python -m unittest discover -s tests -v`: **26 passed, 0 failed** (10 inventory, 3 lagged-covariate, 1 hierarchy, 8 dashboard, 4 sample-selection tests).
 - The selection-specific suite includes four checks for explicit and derived cutoff behavior and post-cutoff independence.
-- Dashboard tests: home route and all six tab callbacks returned successfully.
-- Pipeline: completed with exit code 0 using `MPLBACKEND=Agg` and a writable `MPLCONFIGDIR`; generated 1,760 official-test forecast rows and 110 recommendations.
+- Dashboard launch: `./.venv/bin/python app.py` started on `http://127.0.0.1:8050/`; live HTTP GET returned 200. Automated callback tests for all six tabs passed.
+- Pipeline: rerun on 2026-11-20 with `MPLBACKEND=Agg` and `MPLCONFIGDIR=.mplconfig`; completed successfully, generating 1,760 official-test forecast rows and 110 recommendations. The optional Darts API emitted its documented upstream deprecation warning but executed in all benchmark stages.
+- `./.venv/bin/python -m compileall -q src dashboard app.py tests`: passed.
+- `./.venv/bin/python -m pip check`: passed with no broken requirements.
 - Saved primary and common-sample metrics were independently recomputed from held-out CSV predictions and agree with the JSON outputs to floating-point precision.
 - TFT remains untrained; no metric or prediction artifact is reported.
 
-## Remaining limitations and next steps
+## Repository hygiene and privacy
 
-1. Run the prepared TFT notebook on Colab GPU and add it to comparisons only after successful checkpoint, predictions, metrics, and execution report are saved.
-2. The evaluated sample is limited to 39 items and three of Favorita's stores; the Prophet/Darts benchmark is further limited to six series.
-3. Inventory quantities use zero default on-hand stock and assumed generic costs; replace them with business-approved stock, lead time, capacity, holding, and shortage inputs before operational interpretation.
-4. Interval coverage is empirical and marginal; assess more rolling origins and coverage by item/store.
-5. The dashboard is verified locally. Record the scripted demo or deploy it through an approved host for submission.
-6. Review the individual reflection prompts and add personal details that cannot be established from repository evidence.
+Raw and processed datasets, generated outputs other than this audit report, model artifacts, virtual environments, and common credential file patterns are excluded by `.gitignore`. `git ls-files` showed only the processed-data placeholder and this audit report under `data/` and `outputs/`; no dataset CSVs or credential files are tracked. The README contains only the owner-provided public profile links. No history rewrite was made.
+
+## Limitations
+
+- **TFT training and final held-out evaluation were not completed.** A Colab Tesla T4 selection run completed, but final training encountered CUDA deterministic-operation and PyTorch Forecasting/Lightning scheduler compatibility errors. Scheduler handling was adjusted, but subsequent attempts were constrained by Colab GPU usage limits. No TFT metrics or predictions are claimed.
+- The evaluated sample is limited to 39 items and three Favorita stores; the Prophet/Darts benchmark is further limited to six series.
+- Inventory quantities use zero-default on-hand stock and assumed generic costs. Business-approved stock, lead-time, capacity, holding, and shortage inputs are needed before operational interpretation.
+- Prediction-interval coverage is empirical and limited.
