@@ -1,11 +1,13 @@
 from pathlib import Path
 import json
 import pandas as pd
-from dash import Dash, dcc, html, Input, Output
+from dash import Dash, dcc, html, dash_table, Input, Output
+from dash.dash_table.Format import Format, Scheme, Group
 import plotly.express as px
+import plotly.graph_objects as go
 from src.evaluation.metrics import score
 
-OUT=Path("outputs"); app=Dash(__name__, title="Retail Demand & Inventory")
+OUT=Path("outputs"); app=Dash(__name__, title="Retail Demand & Inventory",suppress_callback_exceptions=True)
 def load_csv(name):
     p=OUT/name
     if not p.exists(): return pd.DataFrame()
@@ -15,6 +17,8 @@ def load_csv(name):
 forecast=load_csv("forecasts/forecast.csv")
 val=load_csv("forecasts/model_comparison_validation.csv")
 if val.empty: val=load_csv("forecasts/validation.csv")
+primary_validation=load_csv("forecasts/validation.csv")
+if primary_validation.empty: primary_validation=val.copy()
 orders=load_csv("recommendations/orders.csv")
 history=load_csv("forecasts/sales_history.csv")
 try:
@@ -22,8 +26,18 @@ try:
     if not model_metrics_path.exists(): model_metrics_path=OUT/"metrics/model_metrics.json"
     metrics=json.loads(model_metrics_path.read_text())
 except Exception: metrics={}
-stores=sorted(forecast.store_nbr.dropna().unique()) if not forecast.empty and "store_nbr" in forecast else []
-items=sorted(forecast.item_nbr.dropna().unique()) if not forecast.empty and "item_nbr" in forecast else []
+store_values=set()
+item_values=set()
+for source in (history,forecast):
+    if not source.empty and "store_nbr" in source: store_values.update(source.store_nbr.dropna().unique().tolist())
+    if not source.empty and "item_nbr" in source: item_values.update(source.item_nbr.dropna().unique().tolist())
+stores=sorted(store_values); items=sorted(item_values)
+available_dates=[]
+for source in (history,primary_validation,forecast):
+    if not source.empty and "date" in source: available_dates.extend([source.date.min(),source.date.max()])
+date_min=min(available_dates) if available_dates else None
+date_max=max(available_dates) if available_dates else None
+default_date_start=(forecast.date.min()-pd.DateOffset(years=1)) if not forecast.empty else date_min
 
 def verify_heldout_metrics(saved, validation):
     """Recompute metrics from saved held-out predictions and pre-holdout history."""
@@ -186,40 +200,199 @@ def inventory_panel(frame):
       html.P(brief,style={"background":"#f8fafc","borderLeft":"4px solid #4b84b6","padding":"12px 16px"}),
       dcc.Graph(figure=inv_fig,config={"displayModeBar":True,"displaylogo":False}),
       dcc.Graph(figure=cost_fig,config={"displayModeBar":True,"displaylogo":False}),html.H3("Policy detail by item and store"),table])
+
+def filter_frame(frame,stores_selected,items_selected,start,end):
+    """Apply the same global scope and date controls to an output table."""
+    result=frame.copy()
+    if result.empty: return result
+    if stores_selected and "store_nbr" in result: result=result[result.store_nbr.isin(stores_selected)]
+    if items_selected and "item_nbr" in result: result=result[result.item_nbr.isin(items_selected)]
+    if start and "date" in result: result=result[result.date>=pd.to_datetime(start)]
+    if end and "date" in result: result=result[result.date<=pd.to_datetime(end)]
+    return result
+
+def metric_card(title,value):
+    return html.Div([html.Div(title,style={"fontSize":"13px","color":"#596579"}),
+      html.Div(value,style={"fontSize":"25px","fontWeight":"700","color":"#17324d"})],
+      style={"background":"#f4f7fa","border":"1px solid #dbe3ec","borderRadius":"10px","padding":"15px","flex":"1","minWidth":"180px"})
+
+def store_item_summary_values(rows):
+    """Summarize the table's currently filtered rows, not the unfiltered source."""
+    frame=pd.DataFrame(rows or [])
+    if frame.empty:
+        return "0.00","0","0"
+    return (f"{pd.to_numeric(frame.forecast_units,errors='coerce').fillna(0).sum():,.2f}",
+      f"{frame.store_nbr.nunique():,}",f"{frame.item_nbr.nunique():,}")
+
+def store_item_analysis_view(frame):
+    """Render globally filtered forecasts as a searchable, sortable data table."""
+    if frame.empty:
+        aggregated=pd.DataFrame(columns=["store_nbr","item_nbr","forecast_units"])
+    else:
+        aggregated=(frame.groupby(["store_nbr","item_nbr"],as_index=False,observed=True).forecast.sum()
+          .rename(columns={"forecast":"forecast_units"})
+          .sort_values("forecast_units",ascending=False).reset_index(drop=True))
+    total_units,store_count,item_count=store_item_summary_values(aggregated.to_dict("records"))
+    table=dash_table.DataTable(
+      id="store-item-analysis-table",
+      columns=[
+        {"name":"Store Number","id":"store_nbr","type":"numeric"},
+        {"name":"Item Number","id":"item_nbr","type":"numeric"},
+        {"name":"Forecast Units","id":"forecast_units","type":"numeric",
+         "format":Format(precision=2,scheme=Scheme.fixed,group=Group.yes)},
+      ],
+      data=aggregated.to_dict("records"),
+      sort_action="native",sort_mode="multi",sort_by=[{"column_id":"forecast_units","direction":"desc"}],
+      filter_action="native",filter_options={"case_sensitive":False},
+      page_action="native",page_size=20,
+      style_table={"overflowX":"auto","border":"1px solid #dbe3ec","borderRadius":"8px"},
+      style_header={"backgroundColor":"#f4f7fa","color":"#17324d","fontWeight":"700",
+        "borderBottom":"2px solid #dbe3ec","padding":"12px 14px"},
+      style_cell={"padding":"11px 14px","fontFamily":"Arial","fontSize":"14px",
+        "color":"#243b53","borderBottom":"1px solid #edf1f5","height":"auto",
+        "minWidth":"130px","width":"33%","maxWidth":"none"},
+      style_cell_conditional=[
+        {"if":{"column_id":"store_nbr"},"textAlign":"left"},
+        {"if":{"column_id":"item_nbr"},"textAlign":"left"},
+        {"if":{"column_id":"forecast_units"},"textAlign":"right"},
+      ],
+      style_data_conditional=[{"if":{"row_index":"odd"},"backgroundColor":"#fbfcfe"}],
+    )
+    return html.Div([
+      html.Div([html.Div([html.Div("Total forecast units",style={"fontSize":"13px","color":"#596579"}),
+          html.Div(total_units,id="store-item-total-units",style={"fontSize":"25px","fontWeight":"700","color":"#17324d"})],
+          style={"background":"#f4f7fa","border":"1px solid #dbe3ec","borderRadius":"10px","padding":"15px","flex":"1","minWidth":"180px"}),
+        html.Div([html.Div("Stores displayed",style={"fontSize":"13px","color":"#596579"}),
+          html.Div(store_count,id="store-item-stores-count",style={"fontSize":"25px","fontWeight":"700","color":"#17324d"})],
+          style={"background":"#f4f7fa","border":"1px solid #dbe3ec","borderRadius":"10px","padding":"15px","flex":"1","minWidth":"180px"}),
+        html.Div([html.Div("Items displayed",style={"fontSize":"13px","color":"#596579"}),
+          html.Div(item_count,id="store-item-items-count",style={"fontSize":"25px","fontWeight":"700","color":"#17324d"})],
+          style={"background":"#f4f7fa","border":"1px solid #dbe3ec","borderRadius":"10px","padding":"15px","flex":"1","minWidth":"180px"})],
+        style={"display":"flex","gap":"12px","flexWrap":"wrap","marginBottom":"16px"}),
+      html.P("Forecast totals reflect the current store, item, and date selections. Use the column filters to search the results and sort any column.",
+        style={"background":"#f8fafc","borderLeft":"4px solid #4b84b6","padding":"10px 14px"}),
+      table])
+
+@app.callback(
+  Output("store-item-total-units","children"),
+  Output("store-item-stores-count","children"),
+  Output("store-item-items-count","children"),
+  Input("store-item-analysis-table","derived_virtual_data"),
+)
+def update_store_item_summary(rows):
+    """Keep KPI cards in sync with native table search/filter results."""
+    return store_item_summary_values(rows)
+
+def sales_trends_view(frame):
+    """Build charts and KPIs from observed historical Favorita sales only."""
+    if frame.empty:
+        return html.P("No historical sales match the current store, item, and date filters.")
+    daily=frame.groupby("date",as_index=False).sales.sum().sort_values("date")
+    total=float(daily.sales.sum())
+    average=float(daily.sales.mean())
+    peak=daily.loc[daily.sales.idxmax()]
+    cards=[metric_card("Actual sales units",f"{total:,.0f}"),
+      metric_card("Average actual units / day",f"{average:,.1f}"),
+      metric_card("Peak sales day",f"{peak.date:%b %d, %Y} · {peak.sales:,.0f} units"),
+      metric_card("Stores in view",f"{frame.store_nbr.nunique():,}")]
+    trend=px.line(daily,x="date",y="sales",title="Daily historical sales · actuals only",
+      labels={"date":"Date","sales":"Actual units"})
+    trend.update_traces(line={"color":"#4b84b6","width":2},hovertemplate="%{x|%b %d, %Y}<br>Actual sales: %{y:,.1f}<extra></extra>")
+    trend.update_layout(plot_bgcolor="white",paper_bgcolor="white",margin={"t":55,"b":25},showlegend=False)
+
+    weekdays=frame.assign(weekday=frame.date.dt.dayofweek).groupby("weekday",as_index=False).sales.mean()
+    weekday_names=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+    weekdays=weekdays.set_index("weekday").reindex(range(7),fill_value=0).rename_axis("weekday").reset_index()
+    weekdays["weekday_name"]=[weekday_names[int(day)] for day in weekdays.weekday]
+    weekly=px.bar(weekdays,x="weekday_name",y="sales",title="Average actual sales by weekday",
+      labels={"weekday_name":"Day of week","sales":"Average actual units"},color_discrete_sequence=["#21936b"])
+    weekly.update_layout(plot_bgcolor="white",paper_bgcolor="white",showlegend=False,margin={"t":55,"b":25})
+
+    by_store=frame.groupby(["date","store_nbr"],as_index=False).sales.sum()
+    store_fig=px.line(by_store,x="date",y="sales",color="store_nbr",title="Historical sales by selected store",
+      labels={"date":"Date","sales":"Actual units","store_nbr":"Store"})
+    store_fig.update_layout(plot_bgcolor="white",paper_bgcolor="white",margin={"t":55,"b":25},legend_title_text="Store")
+    options={"displayModeBar":True,"displaylogo":False}
+    return html.Div([
+      html.Div(cards,style={"display":"flex","gap":"12px","flexWrap":"wrap","marginBottom":"16px"}),
+      html.P("All values and charts on this tab come from observed Favorita sales; forecasts and prediction intervals are excluded.",
+        style={"background":"#f8fafc","borderLeft":"4px solid #4b84b6","padding":"10px 14px"}),
+      dcc.Graph(figure=trend,config=options),
+      html.Div([dcc.Graph(figure=weekly,config=options,style={"flex":"1","minWidth":"320px"}),
+        dcc.Graph(figure=store_fig,config=options,style={"flex":"2","minWidth":"420px"})],
+        style={"display":"flex","gap":"14px","flexWrap":"wrap"})])
+
+def demand_forecasts_view(history_frame,validation_frame,future_frame):
+    """Show actual history, saved rolling validation predictions, and future forecasts."""
+    validation_start=primary_validation.date.min() if not primary_validation.empty else pd.Timestamp.max
+    history_plot=history_frame[history_frame.date < validation_start]
+    fig=go.Figure()
+    if not history_plot.empty:
+        daily=history_plot.groupby("date",as_index=False).sales.sum().sort_values("date")
+        fig.add_trace(go.Scatter(x=daily.date,y=daily.sales,name="Historical actual sales",mode="lines",
+          line={"color":"#52606d","width":1.7},hovertemplate="%{x|%b %d, %Y}<br>Actual: %{y:,.1f}<extra></extra>"))
+    if not validation_frame.empty:
+        actual=validation_frame.groupby("date",as_index=False).actual.sum().sort_values("date")
+        predicted=validation_frame.groupby("date",as_index=False).forecast.sum().sort_values("date")
+        fig.add_trace(go.Scatter(x=actual.date,y=actual.actual,name="Validation actual sales",mode="lines",
+          line={"color":"#17324d","width":2.4},hovertemplate="%{x|%b %d, %Y}<br>Actual: %{y:,.1f}<extra></extra>"))
+        model_name="Selected-model validation prediction"
+        fig.add_trace(go.Scatter(x=predicted.date,y=predicted.forecast,name=model_name,mode="lines",
+          line={"color":"#e28a2c","width":2.2,"dash":"dash"},hovertemplate="%{x|%b %d, %Y}<br>Predicted: %{y:,.1f}<extra></extra>"))
+    if not future_frame.empty:
+        future_daily=future_frame.groupby("date",as_index=False)[[c for c in ("forecast","lower","upper") if c in future_frame]].sum().sort_values("date")
+        if "lower" in future_daily and "upper" in future_daily:
+            fig.add_trace(go.Scatter(x=future_daily.date,y=future_daily.lower,name="90% interval lower",mode="lines",
+              line={"width":0},showlegend=False,hoverinfo="skip"))
+            fig.add_trace(go.Scatter(x=future_daily.date,y=future_daily.upper,name="90% prediction interval",mode="lines",
+              line={"width":0},fill="tonexty",fillcolor="rgba(75,132,182,0.18)",
+              hovertemplate="%{x|%b %d, %Y}<br>Interval upper: %{y:,.1f}<extra></extra>"))
+        fig.add_trace(go.Scatter(x=future_daily.date,y=future_daily.forecast,name="Future model forecast",mode="lines",
+          line={"color":"#4b84b6","width":2.5},hovertemplate="%{x|%b %d, %Y}<br>Forecast: %{y:,.1f}<extra></extra>"))
+    fig.update_layout(title="Actual sales, held-out predictions, and future forecast",xaxis_title="Date",yaxis_title="Units",
+      plot_bgcolor="white",paper_bgcolor="white",legend_title_text="Series",hovermode="x unified",margin={"t":60,"b":30})
+    cards=[]
+    if not validation_frame.empty:
+        cards.extend([metric_card("Validation actual units",f"{validation_frame.actual.sum():,.0f}"),
+          metric_card("Validation predicted units",f"{validation_frame.forecast.sum():,.0f}")])
+    if not future_frame.empty:
+        cards.append(metric_card("Future forecast units",f"{future_frame.forecast.sum():,.0f}"))
+    note="Validation values compare saved predictions with known actuals; future dates show model forecasts and calibrated intervals, with no actuals available."
+    if fig.data:
+        return html.Div([html.Div(cards,style={"display":"flex","gap":"12px","flexWrap":"wrap","marginBottom":"14px"}),
+          html.P(note,style={"background":"#f8fafc","borderLeft":"4px solid #4b84b6","padding":"10px 14px"}),
+          dcc.Graph(figure=fig,config={"displayModeBar":True,"displaylogo":False})])
+    return html.P("No actual sales or forecast rows match the current store, item, and date filters.")
 app.layout=html.Div([
  html.H1("Retail Demand Forecasting & Inventory Planning"),
  html.P("Favorita grocery sales · bottom-up coherent rollups · empirical residual intervals"),
  html.Div([html.Label("Store"),dcc.Dropdown(stores,stores,multi=True,id="stores"),html.Label("Item"),dcc.Dropdown(items,items,multi=True,id="items"),html.Label("Date range"),
-     dcc.DatePickerRange(id="dates",start_date=forecast.date.min() if not forecast.empty else None,end_date=forecast.date.max() if not forecast.empty else None)],style={"maxWidth":"900px"}),
+     dcc.DatePickerRange(id="dates",start_date=default_date_start,end_date=date_max,
+       min_date_allowed=date_min,max_date_allowed=date_max)],style={"maxWidth":"900px"}),
  dcc.Tabs(id="tabs",value="Executive Overview",children=[dcc.Tab(label=x,value=x) for x in ["Executive Overview","Sales Trends","Demand Forecasts","Model Performance","Inventory Optimization","Store and Item Analysis"]]),
  html.Div(id="content",style={"padding":"20px"})],style={"fontFamily":"Arial","maxWidth":"1200px","margin":"auto"})
 @app.callback(Output("content","children"),Input("stores","value"),Input("items","value"),Input("dates","start_date"),Input("dates","end_date"),Input("tabs","value"))
 def update(stores,items,start,end,tab):
     if forecast.empty: return html.Div([html.H3("No forecast outputs yet"),html.P("Add Favorita CSV files to data/raw/favorita and run python3 -m src.pipeline.")])
-    df=forecast.copy()
-    if stores and "store_nbr" in df: df=df[df.store_nbr.isin(stores)]
-    if items and "item_nbr" in df: df=df[df.item_nbr.isin(items)]
-    if start: df=df[df.date>=pd.to_datetime(start)]
-    if end: df=df[df.date<=pd.to_datetime(end)]
-    daily=df.groupby("date",as_index=False)[["forecast","lower","upper"]].sum()
-    fig=px.line(daily,x="date",y=["forecast","lower","upper"],title="Forecast with 90% interval")
+    df=filter_frame(forecast,stores,items,start,end)
+    historical=filter_frame(history,stores,items,start,end)
+    validation_frame=filter_frame(primary_validation,stores,items,start,end)
     filtered_orders=orders.copy()
     if stores and "store_nbr" in filtered_orders: filtered_orders=filtered_orders[filtered_orders.store_nbr.isin(stores)]
     if items and "item_nbr" in filtered_orders: filtered_orders=filtered_orders[filtered_orders.item_nbr.isin(items)]
-    cards=[html.Div(f"Forecast units: {df.forecast.sum():,.0f}"),html.Div(f"Stores: {df.store_nbr.nunique()}" if "store_nbr" in df else "Stores: unavailable"),html.Div(f"Recommended order units: {filtered_orders.recommended_order.sum():,.0f}" if not filtered_orders.empty else "Orders: unavailable")]
+    cards=[metric_card("Forecast units",f"{df.forecast.sum():,.0f}"),
+      metric_card("Stores in view",f"{df.store_nbr.nunique():,}" if "store_nbr" in df else "Unavailable"),
+      metric_card("Recommended order units",f"{filtered_orders.recommended_order.sum():,.0f}" if not filtered_orders.empty else "Unavailable"),
+      metric_card("Modeled inventory cost",f"{filtered_orders.total_objective_cost.sum():,.2f}" if not filtered_orders.empty else "Unavailable")]
     children=[html.H2(tab)]
-    if tab=="Executive Overview": children += [html.Div(cards,style={"display":"flex","gap":"30px","fontWeight":"bold"}),dcc.Graph(figure=fig)]
-    elif tab=="Sales Trends":
-        h=history.copy()
-        if stores and "store_nbr" in h: h=h[h.store_nbr.isin(stores)]
-        if items and "item_nbr" in h: h=h[h.item_nbr.isin(items)]
-        if start: h=h[h.date>=pd.to_datetime(start)]
-        if end: h=h[h.date<=pd.to_datetime(end)]
-        children.append(dcc.Graph(figure=px.line(h,x="date",y="sales",title="Historical sales") if not h.empty else fig))
-    elif tab=="Demand Forecasts": children.append(dcc.Graph(figure=fig))
+    if tab=="Executive Overview":
+        children += [html.Div(cards,style={"display":"flex","gap":"12px","flexWrap":"wrap"}),
+          html.P("Use Sales Trends for observed daily and weekday patterns. Demand Forecasts separates historical actuals, held-out predictions, and future forecasts.",
+            style={"background":"#f8fafc","borderLeft":"4px solid #4b84b6","padding":"12px 16px","marginTop":"16px"})]
+    elif tab=="Sales Trends": children.append(sales_trends_view(historical))
+    elif tab=="Demand Forecasts": children.append(demand_forecasts_view(historical,validation_frame,df))
     elif tab=="Model Performance": children.append(performance_panel())
     elif tab=="Inventory Optimization": children.append(inventory_panel(filtered_orders))
-    elif tab=="Store and Item Analysis":
-        children.append(html.Pre(df.groupby(["store_nbr","item_nbr"],as_index=False).forecast.sum().nlargest(30,"forecast").to_string(index=False)))
+    elif tab=="Store and Item Analysis": children.append(store_item_analysis_view(df))
     return html.Div(children)
 if __name__=="__main__": app.run(debug=False)

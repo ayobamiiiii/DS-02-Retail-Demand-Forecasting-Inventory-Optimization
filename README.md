@@ -137,9 +137,9 @@ The 47.83% figure is a modeled comparison against the existing policy under the 
 
 The Plotly Dash app provides six tabs, with store, item, and date filters:
 
-1. **Executive Overview** — forecast totals and headline store/order counts.
-2. **Sales Trends** — historical sales trend for the selected products and stores.
-3. **Demand Forecasts** — daily forecasts with lower and upper empirical interval bounds.
+1. **Executive Overview** — high-level forecast units, selected stores, recommended order units, and modeled inventory cost, without a duplicate detail chart.
+2. **Sales Trends** — actual historical daily sales, weekday pattern, store comparisons, and actual-sales KPIs. This tab never plots model predictions or intervals.
+3. **Demand Forecasts** — historical actuals, saved validation actual-versus-predicted values, and future model forecasts with lower and upper empirical interval bounds.
 4. **Model Performance** — dynamic model metrics, per-metric leaders, evaluation scope, and held-out prediction verification.
 5. **Inventory Optimization** — order and cost KPIs, demand/inventory/order chart, policy comparison, and recommendation table.
 6. **Store and Item Analysis** — highest forecast store-item combinations for the selected filters.
@@ -226,11 +226,11 @@ python -m src.pipeline --config config/default.yaml
 python app.py
 ```
 
-The pipeline writes forecasts, validation predictions, metrics, hierarchy rollups, inventory recommendations, and a LightGBM artifact under `outputs/`. Configure sample size, stores, validation periods, model comparison windows, and inventory assumptions in `config/default.yaml`. For the optional TFT handoff, enable a Colab T4 GPU, upload `notebooks/tft_colab.ipynb`, and provide the locally generated `data/processed/tft_favorita_116_series.csv` when prompted. TFT results remain pending until that notebook finishes successfully.
+The pipeline writes forecasts, validation predictions, metrics, hierarchy rollups, inventory recommendations, and a LightGBM artifact under `outputs/`. Configure sample size, stores, validation periods, model comparison windows, and inventory assumptions in `config/default.yaml`. For the optional TFT handoff, open `notebooks/tft_colab.ipynb` in Colab, select a T4 GPU, and upload `data/processed/tft_favorita_116_series.csv`, `notebooks/tft_dataset_manifest.json`, `outputs/forecasts/validation.csv`, and `outputs/forecasts/model_comparison_validation.csv` when prompted. TFT results remain pending until that notebook finishes successfully.
 
 ## 12. Testing and validation
 
-The latest full run reported **20 tests passed**: 10 inventory optimization tests, three lagged-covariate/future-origin tests, one hierarchy test, two dashboard route/callback tests, and four sample-selection cutoff tests. The final audit also records successful compilation, `pip check`, solver statuses, and interval coverage.
+The latest full run reported **24 tests passed**: 10 inventory optimization tests, three lagged-covariate/future-origin tests, one hierarchy test, six dashboard route/view tests, and four sample-selection cutoff tests. The final audit also records successful compilation, `pip check`, solver statuses, and interval coverage.
 
 Run the project checks locally:
 

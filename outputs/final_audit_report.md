@@ -8,7 +8,7 @@
 
 The item and benchmark-series selectors now use only sales dated before the earliest configured evaluation window. For this run, the exclusive cutoff is **2017-06-21**; it precedes model selection (June 21–July 4), calibration (July 5–18), and held-out evaluation (July 19–August 15). A cache provenance manifest records the cutoff and selected IDs, and unmanifested or mismatched caches are rebuilt. Four regression tests cover the explicit cutoff, post-cutoff independence for item and series ranking, and derived cutoff dates.
 
-The pipeline was rerun successfully from the corrected sample. Naive Weekly, LightGBM, Prophet, and Darts Regression have actual held-out predictions and refreshed metrics. Metrics were independently recomputed from the saved prediction CSVs using the project scoring function. OR-Tools returned `OPTIMAL` for all 110 recommendations. All 20 automated tests pass, including callbacks for all six dashboard tabs. TFT remains **pending GPU training**; no TFT prediction or score is claimed.
+The pipeline was rerun successfully from the corrected sample. Naive Weekly, LightGBM, Prophet, and Darts Regression have actual held-out predictions and refreshed metrics. Metrics were independently recomputed from the saved prediction CSVs using the project scoring function. OR-Tools returned `OPTIMAL` for all 110 recommendations. All 24 automated tests pass, including focused checks for each dashboard view and callbacks for all six tabs. TFT remains **pending GPU training**; no TFT prediction or score is claimed.
 
 ## Requirements audit
 
@@ -19,7 +19,7 @@ The pipeline was rerun successfully from the corrected sample. Naive Weekly, Lig
 | Hierarchical rollups | **Complete** | Generated bottom-up rollups at item-store, item, store, city, state, and overall levels. Hierarchy tests pass. |
 | Prediction intervals | **Complete, empirical** | Separate 14-day residual calibration followed by untouched 28-day evaluation. Primary 90% interval coverage is 90.4249% (3,248 rows); common-sample coverage is 93.4524% (168 rows). |
 | OR-Tools inventory recommendations | **Complete for modeled assumptions** | 110/110 statuses are `OPTIMAL`; four order quantities reach the configured cap. Cost inputs and zero on-hand assumption are proxies. |
-| Automated tests | **Complete** | 20 tests pass, including inventory edge cases, hierarchy, lag/covariate checks, cutoff tests, and dashboard callbacks/routes. |
+| Automated tests | **Complete** | 24 tests pass, including inventory edge cases, hierarchy, lag/covariate checks, cutoff tests, and dashboard view/callback checks. |
 | Six-tab dashboard | **Complete locally** | Automated callback checks cover Executive Overview, Sales Trends, Demand Forecasts, Model Performance, Inventory Optimization, and Store and Item Analysis. Local app route and layout are also verified. |
 | README, setup, architecture, data/API docs | **Complete locally** | README setup and execution, architecture diagram, data/API contracts, and audit report reflect this run. |
 | Demo, presentation, reflection | **Prepared; owner action remains** | Six-tab screen-recording script and 10-minute deck/script are present. There is no hosted deployment or saved screen recording. Reflection includes prompts for personal details only the owner can confirm. |
@@ -69,7 +69,7 @@ The processed panel contains 195,692 rows from 2013-01-02 through 2017-08-15, 39
 
 ## Test and verification results
 
-- `./.venv/bin/python -m unittest discover -s tests -v`: **20 passed, 0 failed**.
+- `./.venv/bin/python -m unittest discover -s tests -v`: **24 passed, 0 failed**.
 - The selection-specific suite includes four checks for explicit and derived cutoff behavior and post-cutoff independence.
 - Dashboard tests: home route and all six tab callbacks returned successfully.
 - Pipeline: completed with exit code 0 using `MPLBACKEND=Agg` and a writable `MPLCONFIGDIR`; generated 1,760 official-test forecast rows and 110 recommendations.

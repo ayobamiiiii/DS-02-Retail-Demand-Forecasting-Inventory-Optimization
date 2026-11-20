@@ -13,7 +13,7 @@
    ```
    On Windows, activate the environment using its Windows activation script.
 2. Open `http://127.0.0.1:8050/` in a browser.
-3. Use the default selection of stores/items and the full forecast date range. The dashboard's forecast artifact covers August 16–31, 2017, for 110 item-store pairs.
+3. Use the default selection of stores/items. The global date picker spans history and the future forecast; its default begins one year before forecast origin. The saved future forecast covers August 16–31, 2017, for 110 item-store pairs.
 4. Hide unrelated windows and browser bookmarks. Keep the app header and global Store, Item, and Date range filters visible.
 5. Do not rerun the pipeline during the recording. The current generated outputs are the evidence shown below.
 
@@ -33,31 +33,31 @@
 
 **Click:** Click the **Executive Overview** tab.
 
-**Demonstrate:** Headline forecast total, store count, recommended order units, and the forecast-with-interval line chart. With the full default selection, the saved forecast has 51,840.2 total units across 110 pairs and 16 dates; the inventory recommendations total 54,814 units.
+**Demonstrate:** Forecast units, selected store count, recommended order units, and modeled inventory cost. The overview intentionally has no detailed chart; use the other tabs for historical and forecast curves. With the default filters, the saved forecast totals 51,840.2 units across 110 pairs and 16 dates; recommendations total 54,814 units.
 
 **Say:**
 
-“The overview summarizes the current filter selection. This forecast covers August 16 through August 31, 2017. Across the 110 item-store pairs, predicted demand sums to about 51,840 units. The optimized policy recommends 54,814 units across the horizon; that can exceed the point forecast because the order model includes safety stock and scenario costs.”
+“The overview keeps the decision summary compact. Across the selected 110 item-store pairs, the August 16–31, 2017 forecast sums to about 51,840 units. The optimizer recommends 54,814 units. The difference reflects safety stock and the configured demand scenarios; these are recommendation units, not additional realized sales.”
 
 ### 1:05–1:40 — Sales Trends
 
 **Click:** Click **Sales Trends**.
 
-**Demonstrate:** Historical sales curve. Point out the overall pattern and any visible weekly variation; avoid claiming a causal seasonal effect from the chart alone.
+**Demonstrate:** The actual-only daily sales line, average actual sales by weekday chart, store-comparison trend, and four historical KPIs. The default range is the latest year of observed sales plus the future forecast window; use the date picker to widen or narrow it. Point out visible weekday differences without claiming causality.
 
 **Say:**
 
-“This view uses the processed historical sales file. It lets a reviewer inspect the selected items and stores before looking at future forecasts. The source panel is daily and zero-fills missing item-store dates, so the curve should be interpreted as the project’s prepared sample rather than a complete retailer-wide ledger.”
+“Every value in this tab comes from observed Favorita sales, not model predictions. It reports total actual units, average actual units per day, the peak sales day, and store count. The charts show daily totals, average by weekday, and actual sales by selected store; absent item-store dates were zero-filled during panel preparation, so this is the prepared sample rather than a complete retailer-wide ledger.”
 
 ### 1:40–2:20 — Demand Forecasts
 
 **Click:** Click **Demand Forecasts**.
 
-**Demonstrate:** Forecast line and lower/upper interval lines; move the pointer over a date to show the plotted values.
+**Demonstrate:** Historical actuals, actual versus saved model predictions over the July 19–August 15 validation period, and the August 16–31 future forecast with its lower/upper interval. Hover dates to distinguish actual, validation prediction, and future forecast values.
 
 **Say:**
 
-“This tab shows the 16-day recursive forecast and the empirical interval bounds. The interval radius was calibrated on a separate 14-day residual period. On the primary 116-series holdout, nominal 90% coverage was 90.42%. That is marginal coverage on this sample, not a guarantee for every item or store.”
+“This tab separates three things: historical actual sales before validation, saved actual and one-day-ahead predictions for July 19–August 15, and the 16-day recursive forecast for August 16–31. The future interval was calibrated using a separate 14-day residual period. Primary nominal 90% coverage was 90.42% on 3,248 held-out rows. It is marginal coverage on this sample, not a guarantee for each item or store. Future dates have predictions but no observed actuals.”
 
 ### 2:20–3:20 — Model Performance
 

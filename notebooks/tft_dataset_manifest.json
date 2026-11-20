@@ -208,7 +208,11 @@
     "lag_1_matches_preceding_date_sales": true,
     "future_covariates_use_only_existing_lagged_features_or_known_calendar": true,
     "sample_selection_cutoff_exclusive": "2017-06-21",
-    "series_ids_match_current_pre_validation_sample": true
+    "series_ids_match_current_pre_validation_sample": true,
+    "series_ids_match_export": true,
+    "primary_validation_keys_match_export": true,
+    "model_comparison_keys_match_export": true,
+    "selection_cutoff_exclusive": "2017-06-21"
   },
   "export_rows": 195692,
   "export_columns": [
@@ -258,5 +262,52 @@
     "time_idx",
     "rmsse_scale"
   ],
-  "feature_warmup_rows": 3248
+  "feature_warmup_rows": 3248,
+  "manifest_schema_version": 2,
+  "export_sha256": "bfb635e225ddec0ef169a51c55b228d1ec334992526dfd5d8dd7f6aea24b2038",
+  "primary_validation_reference": {
+    "file": "outputs/forecasts/validation.csv",
+    "sha256": "7964b5fecc8e2a3bb140f3946dd578edb40d75a9927ce18f3a5764d353873c39",
+    "protocol": "rolling one-day-ahead; observed sales through the prior day",
+    "series_count": 116,
+    "observations": 3248,
+    "start": "2017-07-19",
+    "end": "2017-08-15"
+  },
+  "model_comparison_reference": {
+    "file": "outputs/forecasts/model_comparison_validation.csv",
+    "sha256": "7b6904446edfbea2d47cefb87f1fe5290f2494209c1f5ec39572324fe2e7f15b",
+    "protocol": "recursive 28-day evaluation; forecast-generated lag history after origin",
+    "series_count": 6,
+    "observations": 168,
+    "start": "2017-07-19",
+    "end": "2017-08-15",
+    "series_ids": [
+      "1_1473474",
+      "1_1503844",
+      "24_1473474",
+      "24_1503844",
+      "37_1503844",
+      "37_1695835"
+    ],
+    "metrics_file": "outputs/metrics/model_comparison.json",
+    "selected_model": "lightgbm"
+  },
+  "model_selection_period": {
+    "start": "2017-06-21",
+    "end": "2017-07-04",
+    "days": 14
+  },
+  "model_comparison_evaluation_period": {
+    "start": "2017-07-19",
+    "end": "2017-08-15",
+    "days": 28
+  },
+  "colab_upload_files": [
+    "notebooks/tft_colab.ipynb",
+    "data/processed/tft_favorita_116_series.csv",
+    "notebooks/tft_dataset_manifest.json",
+    "outputs/forecasts/validation.csv",
+    "outputs/forecasts/model_comparison_validation.csv"
+  ]
 }
