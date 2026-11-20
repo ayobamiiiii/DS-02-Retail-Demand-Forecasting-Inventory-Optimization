@@ -9,7 +9,7 @@ This project builds a multi-store daily demand forecasting and replenishment wor
 **Misbaudeen Abdurrahman**
 
 - **GitHub:** [ayobamiiiii](https://github.com/ayobamiiiii)
-- **Project Repository:** [retail-demand-forecasting](https://github.com/ayobamiiiii/retail-demand-forecasting)
+- **Project Repository:** [DS-02-Retail-Demand-Forecasting-Inventory-Optimization](https://github.com/ayobamiiiii/DS-02-Retail-Demand-Forecasting-Inventory-Optimization)
 - **LinkedIn:** [Misbaudeen Abdurrahman](https://www.linkedin.com/in/misbaudeen-abdurrahman-67723121a)
 
 > **Dataset scope:** The code is organized around a nationwide retail planning problem, but the verified run is a bounded sample of Favorita in Ecuador: 39 items, 116 item-store series, and three stores across three provinces. It is not a full-network or nationwide evaluation, and the data is Favorita—not Walmart M5.
@@ -173,6 +173,10 @@ Python 3.10+; pandas and NumPy for ingestion and feature preparation; scikit-lea
 │   ├── DATA_AND_API.md
 │   ├── DEMO_SCRIPT.md
 │   └── PRESENTATION_SCRIPT.md
+├── presentation/
+│   ├── Nexvia_Final_Project_Presentation.pptx
+│   ├── PRESENTATION_CONTENT_AUDIT.md
+│   └── PRESENTATION_SPEAKER_NOTES.md
 ├── data/
 │   └── processed/.gitkeep         # raw and processed datasets are Git-ignored
 ├── notebooks/
@@ -192,7 +196,8 @@ Python 3.10+; pandas and NumPy for ingestion and feature preparation; scikit-lea
     ├── test_dashboard_tabs.py
     ├── test_favorita_hierarchy.py
     ├── test_favorita_lagged_covariates.py
-    └── test_inventory_optimization.py
+    ├── test_inventory_optimization.py
+    └── test_sample_selection.py
 ```
 
 Raw CSVs, the processed panel, the TFT export CSV, generated forecasts/metrics, fitted model files, and virtual environments are excluded by `.gitignore`. The final audit report is the explicit small generated-output exception.
